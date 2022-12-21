@@ -1,30 +1,5 @@
 /*
- * A small hidden Markov model (HMM) library for C++.
- *
- *  Notation
- * ----------
- * N     : Number of allowed states
- * M     : Number of allowed symbols
- * X     : Observed sequence of symbols
- * Y     : Hidden sequence of states associated with X
- * T     : Number of observations/hidden states
- * A     : Transition probability matrix of size (N, N)
- * B     : Emission probability matrix of size (N, M)
- * pi    : Initial state distribution
- * theta : HMM consisting of (A, B, pi)
- * alpha : Forward probability matrix of size (T, N)
- * beta  : Backward probability matrix of size (T, N)
- * gamma : Posterior probability matrix of size (T, N)
- *
- *  Notes
- * -------
- * 1. The model class expects and emits normal probabilities (not log probabilities) unless
- *    otherwise noted. The A and B parameters should have rows that sum to roughly 1.0. The
- *    alpha, beta, and gamma parameters will also have normalized rows.
- *
- *  References
- * ------------
- * See README.md
+ * hmm: A small hidden Markov model (HMM) library for C++.
  */
 
 #ifndef HMM_HMM_H
@@ -43,18 +18,13 @@
 #include <string>
 #include <vector>
 
-#ifdef HMM_SMALL
-#  define HMM_DATA_T float
-#  define HMM_SIZE_T std::uint32_t
-#else
-#  define HMM_DATA_T double
-#  define HMM_SIZE_T std::uint64_t
-#endif
-
 #define HMM_ASSERT assert
-#define HMM_EPSILON (HMM_DATA_T {1e-3})
+#define HMM_EPSILON 1e-3
 
 namespace hmm {
+
+using size_t = std::size_t;
+using data_t = double;
 
 template<std::floating_point T>
 auto isclose_abs(T x, T y, T epsilon)
@@ -91,7 +61,7 @@ public:
     using value_type = T;
     using inner_type = std::vector<T>;
 
-    constexpr explicit vector(HMM_SIZE_T size)
+    constexpr explicit vector(size_t size)
         : m_data(size)
     {}
 
@@ -100,20 +70,20 @@ public:
     {}
 
     [[nodiscard]]
-    constexpr auto size() const -> HMM_SIZE_T
+    constexpr auto size() const -> size_t
     {
         return m_data.size();
     }
 
     [[nodiscard]]
-    constexpr auto operator()(HMM_SIZE_T i) -> T&
+    constexpr auto operator()(size_t i) -> T&
     {
         HMM_ASSERT(i < m_data.size());
         return m_data[i];
     }
 
     [[nodiscard]]
-    constexpr auto operator()(HMM_SIZE_T i) const -> const T&
+    constexpr auto operator()(size_t i) const -> const T&
     {
         HMM_ASSERT(i < m_data.size());
         return m_data[i];
@@ -157,30 +127,30 @@ public:
     using value_type = typename vector<T>::value_type;
     using inner_type = typename vector<T>::inner_type;
 
-    constexpr matrix(HMM_SIZE_T nrows, HMM_SIZE_T ncols)
+    constexpr matrix(size_t nrows, size_t ncols)
         : base_type {nrows * ncols},
           m_ncols {ncols}
     {}
 
-    constexpr explicit matrix(HMM_SIZE_T ncols, inner_type data)
+    constexpr explicit matrix(size_t ncols, inner_type data)
         : base_type {std::move(data)},
           m_ncols {ncols}
     {}
 
     [[nodiscard]]
-    constexpr auto nrows() const -> HMM_SIZE_T
+    constexpr auto nrows() const -> size_t
     {
         return base_type::size() / m_ncols;
     }
 
     [[nodiscard]]
-    constexpr auto ncols() const -> HMM_SIZE_T
+    constexpr auto ncols() const -> size_t
     {
         return m_ncols;
     }
 
     [[nodiscard]]
-    constexpr auto operator()(HMM_SIZE_T i, HMM_SIZE_T j) -> value_type&
+    constexpr auto operator()(size_t i, size_t j) -> value_type&
     {
         HMM_ASSERT(i < nrows());
         HMM_ASSERT(j < m_ncols);
@@ -188,7 +158,7 @@ public:
     }
 
     [[nodiscard]]
-    constexpr auto operator()(HMM_SIZE_T i, HMM_SIZE_T j) const -> const value_type&
+    constexpr auto operator()(size_t i, size_t j) const -> const value_type&
     {
         HMM_ASSERT(i < nrows());
         HMM_ASSERT(j < m_ncols);
@@ -197,18 +167,18 @@ public:
 
 private:
     using base_type = vector<T>;
-    HMM_SIZE_T m_ncols;
+    size_t m_ncols;
 };
 
-using data_matrix_t = matrix<HMM_DATA_T>;
-using size_matrix_t = matrix<HMM_SIZE_T>;
-using data_vector_t = vector<HMM_DATA_T>;
-using size_vector_t = vector<HMM_SIZE_T>;
+using data_matrix_t = matrix<data_t>;
+using size_matrix_t = matrix<size_t>;
+using data_vector_t = vector<data_t>;
+using size_vector_t = vector<size_t>;
 
-using data_matrix_v = std::vector<matrix<HMM_DATA_T>>;
-using size_matrix_v = std::vector<matrix<HMM_SIZE_T>>;
-using data_vector_v = std::vector<vector<HMM_DATA_T>>;
-using size_vector_v = std::vector<vector<HMM_SIZE_T>>;
+using data_matrix_v = std::vector<matrix<data_t>>;
+using size_matrix_v = std::vector<matrix<size_t>>;
+using data_vector_v = std::vector<vector<data_t>>;
+using size_vector_v = std::vector<vector<size_t>>;
 
 struct model_parameters {
    data_matrix_t A;
@@ -223,7 +193,7 @@ struct generate_result {
 
 struct evaluate_result {
     data_matrix_t alpha;
-    HMM_DATA_T log_p {};
+    data_t log_p {};
 };
 
 struct predict_result {
@@ -238,7 +208,7 @@ struct decode_result {
 };
 
 struct fix_parameters {
-    enum: HMM_SIZE_T {
+    enum: size_t {
         TRANSITION = 0,
         EMISSION = 1,
         INITIAL = 2,
@@ -248,7 +218,7 @@ struct fix_parameters {
 };
 
 struct fit_result {
-    HMM_DATA_T log_p {};
+    data_t log_p {};
 };
 
 struct pseudocounts {
@@ -283,17 +253,17 @@ public:
     /*
      * Set the PRNG seed (used for generating observations/states).
      */
-    auto seed(HMM_SIZE_T seed) -> void;
+    auto seed(size_t seed) -> void;
 
     /*
      * Get the number of allowed states.
      */
-    [[nodiscard]] auto N() const -> HMM_SIZE_T;
+    [[nodiscard]] auto N() const -> size_t;
 
     /*
      * Get the number of allowed symbols.
      */
-    [[nodiscard]] auto M() const -> HMM_SIZE_T;
+    [[nodiscard]] auto M() const -> size_t;
 
     /*
      * Get the model parameters: theta = (A, B, pi).
@@ -303,7 +273,7 @@ public:
     /*
      * Generate a sequence of observations, as well as the associated sequence of hidden states.
      */
-    [[nodiscard]] auto generate(HMM_SIZE_T T) -> generate_result;
+    [[nodiscard]] auto generate(size_t T) -> generate_result;
 
     /*
      * Determine the probability of the observations given the model.

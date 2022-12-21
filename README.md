@@ -1,6 +1,18 @@
 # hmm
 `hmm` is a small C++ library for working with hidden Markov models (HMMs).
 
+## Features
++ Implements HMM training, decoding, and evaluation
++ Performs calculations in log space to avoid floating-point underflow
++ Supports pseudocounts to avoid zero probabilities during parameter estimation
++ Certain model parameters can be fixed during training
++ Models can be serialized
+
+## Caveats
++ Uses dense data structures to represent the model parameters
+  + Causes wasted space when there are relatively few possible transitions
+  + Makes this implementation unfeasible for high-order models
+
 ## Description
 We represent a HMM with 3 model parameters: $A$, $B$, and $\pi$.
 $A$ represents the transition probabilities, where $A_{ij} = P(Y_{t+1}=j|Y_t=i)$ is the probability of transitioning into state $j$ from state $i$.
@@ -22,16 +34,29 @@ Once we have a `hmm::model`, we can use it to:
 3. Predict the most-likely state sequence corresponding to the observations (Viterbi)
 4. Train the model using example observations (Baum-Welch)
 
-## Features
-+ Performs calculations in log space to avoid floating-point underflow
-+ Supports pseudocounts to avoid zero probabilities during parameter estimation
-+ Parameters can be fixed during training
-+ Serialization of models
+## Build
+`hmm` is built using CMake.
+In the project root directory, run
+```bash
+mkdir -p build && cd ./build
+```
 
-## Caveats
-+ Uses dense data structures to represent the model parameters
-  + Causes wasted space when there are relatively few possible transitions
-  + Makes this implementation unfeasible for high-order models
+followed by
+```bash
+cmake .. && cmake --build .
+```
+
+to build the library and tests.
+The tests must be built with assertions enabled.
+To build the library in release mode without tests, the last command would look like:
+```bash
+cmake -DHMM_BUILD_TESTS=Off .. && cmake --build . --config Release
+```
+
+Finally, a cleaned-up install can be created at `PREFIX` using:
+```bash
+cmake --install . --prefix "${PREFIX}"
+```
 
 ## Text format
 `hmm` supports a simple serialization protocol.
@@ -58,9 +83,10 @@ Note that each data element $p$ is a probability ($0\le p\le1$) and each row a d
 
 ## TODO
 + Not sure if the initial distribution update is correct, needs to be tested
++ Sparse matrices for handling large models (higher-order models converted to first-order with a ton of states)
 + More testing
 + Examples/use cases
-+ Sparse matrices for handling large models (higher-order models converted to first-order with a ton of states)
++ Documentation
 
 ## References
 1. Durbin, R., Eddy, S., Krogh, A., and Mitchison, G. (2010). Biological Sequence Analysis.

@@ -1,10 +1,10 @@
-#include "hmm.h"
+#include "../include/hmm.h"
 #include <iomanip>
 
 namespace hmm {
 
-static constexpr auto NaN = std::numeric_limits<HMM_DATA_T>::quiet_NaN();
-static constexpr auto inf = std::numeric_limits<HMM_DATA_T>::infinity();
+static constexpr auto NaN = std::numeric_limits<data_t>::quiet_NaN();
+static constexpr auto inf = std::numeric_limits<data_t>::infinity();
 
 /*
  * Compute the sum of two log-probabilities. See [4] for more information.
@@ -34,22 +34,22 @@ auto batched_exp(T &xs)
         x = std::exp(x);
 }
 
-auto normalize_chunks(HMM_SIZE_T N, HMM_SIZE_T M, HMM_DATA_T *p)
+auto normalize_chunks(size_t N, size_t M, data_t *p)
 {
-    for (HMM_SIZE_T i {}; i < N; ++i) {
+    for (size_t i {}; i < N; ++i) {
         const auto base = i * M;
         auto accum = -inf;
-        for (HMM_SIZE_T j {}; j < M; ++j)
+        for (size_t j {}; j < M; ++j)
             accum = log_add(accum, p[base + j]);
-        for (HMM_SIZE_T j {}; j < M; ++j)
+        for (size_t j {}; j < M; ++j)
             p[base + j] -= accum;
     }
 }
 
 [[nodiscard]]
-auto allocate_xi(HMM_SIZE_T N, HMM_SIZE_T T)
+auto allocate_xi(size_t N, size_t T)
 {
-    return std::vector<matrix<HMM_DATA_T>> {T - 1, data_matrix_t {N, N}};
+    return std::vector<matrix<data_t>> {T - 1, data_matrix_t {N, N}};
 }
 
 /*
@@ -62,18 +62,18 @@ auto viterbi(const size_vector_t &X, const model_parameters &model)
     const auto N = B.nrows();
     const auto T = X.size();
     data_matrix_t delta {T, N};
-    matrix<HMM_SIZE_T> psi {T, N};
+    matrix<size_t> psi {T, N};
 
-    for (HMM_SIZE_T i {}; i < N; ++i)
+    for (size_t i {}; i < N; ++i)
         delta(0, i) = pi(i) + B(i, X(0));
 
-    for (HMM_SIZE_T t {1}; t < T; ++t) {
-        for (HMM_SIZE_T j {}; j < N; ++j) {
+    for (size_t t {1}; t < T; ++t) {
+        for (size_t j {}; j < N; ++j) {
             const auto b = B(j, X(t));
             auto value = -inf;
-            HMM_SIZE_T index {};
+            size_t index {};
 
-            for (HMM_SIZE_T i {}; i < N; ++i) {
+            for (size_t i {}; i < N; ++i) {
                 if (const auto p = delta(t - 1, i) + A(i, j) + b; p > value) {
                     value = p;
                     index = i;
@@ -85,10 +85,10 @@ auto viterbi(const size_vector_t &X, const model_parameters &model)
     }
 
     auto value = -inf;
-    HMM_SIZE_T index {};
+    size_t index {};
 
     // Find the end of the most-probable state path.
-    for (HMM_SIZE_T i {}; i < N; ++i) {
+    for (size_t i {}; i < N; ++i) {
         if (delta(T - 1, i) > value) {
             value = delta(T - 1, i);
             index = i;
@@ -97,7 +97,7 @@ auto viterbi(const size_vector_t &X, const model_parameters &model)
 
     // Backtrack through the pointers array.
     size_vector_t path {T};
-    for (HMM_SIZE_T i {}; i < T; ++i) {
+    for (size_t i {}; i < T; ++i) {
         const auto t = T - i - 1;
         path(t) = index;
         index = psi(t, index);
@@ -109,20 +109,20 @@ auto viterbi(const size_vector_t &X, const model_parameters &model)
  * Compute the forward parameter, alpha.
  */
 [[nodiscard]]
-auto forward(const size_vector_t &X, const model_parameters &model) -> matrix<HMM_DATA_T>
+auto forward(const size_vector_t &X, const model_parameters &model) -> matrix<data_t>
 {
     const auto &[A, B, pi] = model;
     const auto N = A.nrows();
     const auto T = X.size();
     data_matrix_t alpha {T, N};
 
-    for (HMM_SIZE_T i {}; i < N; ++i)
+    for (size_t i {}; i < N; ++i)
         alpha(0, i) = pi(i) + B(i, X(0));
 
-    for (HMM_SIZE_T t {1}; t < T; ++t) {
-        for (HMM_SIZE_T j {}; j < N; ++j) {
+    for (size_t t {1}; t < T; ++t) {
+        for (size_t j {}; j < N; ++j) {
             auto accum = -inf;
-            for (HMM_SIZE_T i {}; i < N; ++i)
+            for (size_t i {}; i < N; ++i)
                 accum = log_add(accum, alpha(t - 1, i) + A(i, j));
             // Emission term can be factored out of the previous summation since it corresponds to
             // the destination state.
@@ -136,7 +136,7 @@ auto forward(const size_vector_t &X, const model_parameters &model) -> matrix<HM
  * Compute the backward parameter, beta.
  */
 [[nodiscard]]
-auto backward(const size_vector_t &X, const model_parameters &model) -> matrix<HMM_DATA_T>
+auto backward(const size_vector_t &X, const model_parameters &model) -> matrix<data_t>
 {
     const auto &[A, B, pi] = model;
     const auto N = A.nrows();
@@ -144,10 +144,10 @@ auto backward(const size_vector_t &X, const model_parameters &model) -> matrix<H
     // Note that the last column is already initialized to log(1) = 0.
     data_matrix_t beta {T, N};
 
-    for (HMM_SIZE_T n {}, t {T - 2}; n < T - 1; ++n, --t) {
-        for (HMM_SIZE_T i {}; i < N; ++i) {
+    for (size_t n {}, t {T - 2}; n < T - 1; ++n, --t) {
+        for (size_t i {}; i < N; ++i) {
             auto accum = -inf;
-            for (HMM_SIZE_T j {}; j < N; ++j)
+            for (size_t j {}; j < N; ++j)
                 accum = log_add(accum, beta(t + 1, j) + A(i, j) + B(j, X(t + 1)));
             // Emission term cannot be factored out this time since the loop varies on the destination state,
             // which is where the symbol is emitted.
@@ -167,13 +167,13 @@ auto state_posterior(const data_matrix_t &alpha, const data_matrix_t &beta)
     const auto N = alpha.ncols();
     data_matrix_t gamma {T, N};
     
-    for (HMM_SIZE_T t {}; t < T; ++t) {
+    for (size_t t {}; t < T; ++t) {
         auto accum = -inf;
-        for (HMM_SIZE_T i {}; i < N; ++i) {
+        for (size_t i {}; i < N; ++i) {
             gamma(t, i) = alpha(t, i) + beta(t, i);
             accum = log_add(accum, gamma(t, i));
         }
-        for (HMM_SIZE_T i {}; i < N; ++i)
+        for (size_t i {}; i < N; ++i)
             gamma(t, i) -= accum;
     }
     return gamma;
@@ -190,17 +190,17 @@ auto segment_posterior(const size_vector_t &X, const model_parameters &model, co
     const auto N = alpha.ncols();
     auto xi = allocate_xi(N, T);
 
-    for (HMM_SIZE_T t {}; t < T - 1; ++t) {
+    for (size_t t {}; t < T - 1; ++t) {
         auto den = -inf;
-        for (HMM_SIZE_T i {}; i < N; ++i) {
-            for (HMM_SIZE_T j {}; j < N; ++j) {
+        for (size_t i {}; i < N; ++i) {
+            for (size_t j {}; j < N; ++j) {
                 const auto num = alpha(t, i) + A(i, j) + B(j, X(t + 1)) + beta(t + 1, j);
                 den = log_add(den, num);
                 xi[t](i, j) = num;
             }
         }
-        for (HMM_SIZE_T i {}; i < N; ++i) {
-            for (HMM_SIZE_T j {}; j < N; ++j)
+        for (size_t i {}; i < N; ++i) {
+            for (size_t j {}; j < N; ++j)
                 xi[t](i, j) -= den;
         }
     }
@@ -208,7 +208,7 @@ auto segment_posterior(const size_vector_t &X, const model_parameters &model, co
 }
 
 [[nodiscard]]
-auto update_model(const size_vector_t &X, model_parameters &model, const data_matrix_t &gamma, const std::vector<matrix<HMM_DATA_T>> &xi, const fix_parameters &fixed)
+auto update_model(const size_vector_t &X, model_parameters &model, const data_matrix_t &gamma, const std::vector<matrix<data_t>> &xi, const fix_parameters &fixed)
 {
     auto &[A, B, pi] = model;
     const auto N = A.nrows();
@@ -223,11 +223,11 @@ auto update_model(const size_vector_t &X, model_parameters &model, const data_ma
     //            # transitions from state i to state *
     //
     if (!fixed.values[fix_parameters::TRANSITION]) {
-        for (HMM_SIZE_T i {}; i < N; ++i) {
-            for (HMM_SIZE_T j {}; j < N; ++j) {
+        for (size_t i {}; i < N; ++i) {
+            for (size_t j {}; j < N; ++j) {
                 auto num = -inf;
                 auto den = -inf;
-                for (HMM_SIZE_T t {}; t < T - 1; ++t) {
+                for (size_t t {}; t < T - 1; ++t) {
                     num = log_add(num, xi[t](i, j));
                     den = log_add(den, gamma(t, i));
                 }
@@ -243,11 +243,11 @@ auto update_model(const size_vector_t &X, model_parameters &model, const data_ma
     //            # emissions of symbol * from state j
     //
     if (!fixed.values[fix_parameters::EMISSION]) {
-        for (HMM_SIZE_T j {}; j < N; ++j) {
-            for (HMM_SIZE_T k {}; k < M; ++k) {
+        for (size_t j {}; j < N; ++j) {
+            for (size_t k {}; k < M; ++k) {
                 auto num = -inf;
                 auto den = -inf;
-                for (HMM_SIZE_T t {}; t < T; ++t) {
+                for (size_t t {}; t < T; ++t) {
                     num = X(t) == k
                         ? log_add(num, gamma(t, j)) : num;
                     den = log_add(den, gamma(t, j));
@@ -259,7 +259,7 @@ auto update_model(const size_vector_t &X, model_parameters &model, const data_ma
 
     // Update the initial distribution.
     if (!fixed.values[fix_parameters::INITIAL]) {
-        for (HMM_SIZE_T i {}; i < N; ++i)
+        for (size_t i {}; i < N; ++i)
             pi(i) = gamma(0, i);
     }
 }
@@ -294,7 +294,7 @@ auto load_parameters(std::istream &is) -> model_parameters
 
 auto save_parameters(std::ostream &os, const model_parameters &theta, bool readable) -> void
 {
-    static constexpr auto precision = std::numeric_limits<HMM_DATA_T>::max_digits10 + 2;
+    static constexpr auto precision = std::numeric_limits<data_t>::max_digits10 + 2;
     os << std::setprecision(precision);
 
     const auto try_write = [&os](auto data, const auto &what) {
@@ -311,8 +311,8 @@ auto save_parameters(std::ostream &os, const model_parameters &theta, bool reada
     };
 
     const auto write_matrix = [&](const auto &mat, const auto &what) {
-        for (HMM_SIZE_T i {}; i < mat.nrows(); ++i) {
-            for (HMM_SIZE_T j {}; j < mat.ncols(); ++j) {
+        for (size_t i {}; i < mat.nrows(); ++i) {
+            for (size_t j {}; j < mat.ncols(); ++j) {
                 try_write(mat(i, j), what);
                 if (j != mat.ncols() - 1)
                     add_soft_separator();
@@ -331,7 +331,7 @@ auto save_parameters(std::ostream &os, const model_parameters &theta, bool reada
     write_matrix(theta.A, "transition probability");
     write_matrix(theta.B, "emission probability");
 
-    for (HMM_SIZE_T i {}; i < theta.pi.size(); ++i) {
+    for (size_t i {}; i < theta.pi.size(); ++i) {
         try_write(theta.pi(i), "initial distribution value");
         if (i != theta.pi.size() - 1)
             add_soft_separator();
@@ -341,35 +341,35 @@ auto save_parameters(std::ostream &os, const model_parameters &theta, bool reada
 }
 
 [[nodiscard]]
-auto is_probability(HMM_DATA_T p)
+auto is_probability(data_t p)
 {
-    return !std::isnan(p) && p >= HMM_DATA_T {} && p <= HMM_DATA_T {1};
+    return !std::isnan(p) && p >= data_t {} && p <= data_t {1};
 }
 
 [[nodiscard]]
 auto is_probability_distribution(const data_vector_t &arr)
 {
-    double accum {};
+    data_t accum {};
     for (const auto p: arr) {
         if (!is_probability(p))
             return false;
         accum += p;
     }
-    return isclose_rel(accum, HMM_DATA_T {1}, HMM_EPSILON);
+    return isclose_rel(accum, data_t {1}, HMM_EPSILON);
 }
 
 [[nodiscard]]
 auto is_probability_distribution(const data_matrix_t &mat)
 {
-    for (HMM_SIZE_T i {}; i < mat.nrows(); ++i) {
-        double accum {};
-        for (HMM_SIZE_T j {}; j < mat.ncols(); ++j) {
+    for (size_t i {}; i < mat.nrows(); ++i) {
+        data_t accum {};
+        for (size_t j {}; j < mat.ncols(); ++j) {
             const auto p = mat(i, j);
             if (!is_probability(p))
                 return false;
             accum += p;
         }
-        if (!isclose_rel(accum, HMM_DATA_T {1}, HMM_EPSILON))
+        if (!isclose_rel(accum, data_t {1}, HMM_EPSILON))
             return false;
     }
     return true;
@@ -398,8 +398,8 @@ auto check_model_parameters(const model_parameters &theta)
 
 auto fill_missing_counts(const size_vector_v &Xs, const size_vector_v &Ys, pseudocounts &counts)
 {
-    HMM_SIZE_T N {};
-    HMM_SIZE_T M {};
+    size_t N {};
+    size_t M {};
 
     // Try to get the number of allowed states/symbols from the pseudocounts.
     if (counts.B) {
@@ -444,12 +444,12 @@ auto estimate(const size_vector_v &Xs, const size_vector_v &Ys, pseudocounts cou
     const auto N = emissions.nrows();
     const auto M = emissions.ncols();
 
-    for (HMM_SIZE_T i {}; i < Xs.size(); ++i) {
+    for (size_t i {}; i < Xs.size(); ++i) {
         const auto &X = Xs[i];
         const auto &Y = Ys[i];
         initial(Y(0))++;
         emissions(Y(0), X(0))++;
-        for (HMM_SIZE_T t {1}; t < X.size(); ++t) {
+        for (size_t t {1}; t < X.size(); ++t) {
             transitions(Y(t - 1), Y(t))++;
             emissions(Y(t), X(t))++;
         }
@@ -457,24 +457,24 @@ auto estimate(const size_vector_v &Xs, const size_vector_v &Ys, pseudocounts cou
 
     data_matrix_t A {N, N};
     data_matrix_t B {N, M};
-    HMM_SIZE_T pi_accum {};
+    size_t pi_accum {};
 
-    for (HMM_SIZE_T i {}; i < N; ++i) {
-        HMM_SIZE_T accum {};
-        for (HMM_SIZE_T j {}; j < N; ++j)
+    for (size_t i {}; i < N; ++i) {
+        size_t accum {};
+        for (size_t j {}; j < N; ++j)
             accum += transitions(i, j);
-        for (HMM_SIZE_T j {}; j < N; ++j)
-            A(i, j) = HMM_DATA_T(transitions(i, j)) / HMM_DATA_T(accum);
+        for (size_t j {}; j < N; ++j)
+            A(i, j) = data_t(transitions(i, j)) / data_t(accum);
         accum = 0;
-        for (HMM_SIZE_T j {}; j < M; ++j)
+        for (size_t j {}; j < M; ++j)
             accum += emissions(i, j);
-        for (HMM_SIZE_T j {}; j < M; ++j)
-            B(i, j) = HMM_DATA_T(emissions(i, j)) / HMM_DATA_T(accum);
+        for (size_t j {}; j < M; ++j)
+            B(i, j) = data_t(emissions(i, j)) / data_t(accum);
         pi_accum += initial(i);
     }
     data_vector_t pi {N};
-    for (HMM_SIZE_T i {}; i < N; ++i)
-        pi(i) = HMM_DATA_T(initial(i)) / HMM_DATA_T(pi_accum);
+    for (size_t i {}; i < N; ++i)
+        pi(i) = data_t(initial(i)) / data_t(pi_accum);
 
     batched_log(A);
     batched_log(B);
@@ -483,14 +483,14 @@ auto estimate(const size_vector_v &Xs, const size_vector_v &Ys, pseudocounts cou
 }
 
 [[nodiscard]]
-auto generate(std::default_random_engine &rng, const model_parameters &theta, HMM_SIZE_T T) -> generate_result
+auto generate(std::default_random_engine &rng, const model_parameters &theta, size_t T) -> generate_result
 {
     const auto &[A, B, pi] = theta;
-    std::uniform_real_distribution<HMM_DATA_T> dist;
+    std::uniform_real_distribution<data_t> dist;
 
-    const auto choose = [&](HMM_SIZE_T n, const HMM_DATA_T *const p) {
+    const auto choose = [&](size_t n, const data_t *const p) {
         auto r = dist(rng);
-        for (HMM_SIZE_T i {}; i < n; ++i) {
+        for (size_t i {}; i < n; ++i) {
             if ((r -= std::exp(p[i])) <= 0)
                 return i;
         }
@@ -501,7 +501,7 @@ auto generate(std::default_random_engine &rng, const model_parameters &theta, HM
     hmm::size_vector_t X {T};
     hmm::size_vector_t Y {T};
 
-    for (HMM_SIZE_T t {}; t < T; ++t) {
+    for (size_t t {}; t < T; ++t) {
         Y(t) = choose(A.ncols(), t == 0 ? &pi(0) : &A(Y(t - 1), 0));
         X(t) = choose(B.ncols(), &B(Y(t), 0));
     }
@@ -509,7 +509,7 @@ auto generate(std::default_random_engine &rng, const model_parameters &theta, HM
 }
 
 [[nodiscard]]
-auto compute_log_p(const model &m, const size_vector_v &X) -> HMM_DATA_T
+auto compute_log_p(const model &m, const size_vector_v &X) -> data_t
 {
     auto log_p = -inf;
     for (const auto &x: X)
@@ -553,17 +553,17 @@ model::model(const size_vector_v &X, const size_vector_v &Y, const pseudocounts 
     : m_theta {estimate(X, Y, counts)}
 {}
 
-auto model::seed(HMM_SIZE_T seed) -> void
+auto model::seed(size_t seed) -> void
 {
     m_rng.seed(seed);
 }
 
-auto model::N() const -> HMM_SIZE_T
+auto model::N() const -> size_t
 {
     return m_theta.A.nrows();
 }
 
-auto model::M() const -> HMM_SIZE_T
+auto model::M() const -> size_t
 {
     return m_theta.B.ncols();
 }
@@ -579,7 +579,7 @@ auto model::theta() const -> model_parameters
     return theta;
 }
 
-auto model::generate(HMM_SIZE_T T) -> generate_result
+auto model::generate(size_t T) -> generate_result
 {
     using hmm::generate;
     return generate(m_rng, m_theta, T);
@@ -590,7 +590,7 @@ auto model::evaluate(const size_vector_t &X) const -> evaluate_result
     const auto alpha = forward(X, m_theta);
     auto accum = -inf;
 
-    for (HMM_SIZE_T i {}; i < alpha.ncols(); ++i)
+    for (size_t i {}; i < alpha.ncols(); ++i)
         accum = log_add(accum, alpha(alpha.nrows() - 1, i));
     return {alpha, accum};
 }
@@ -651,4 +651,3 @@ auto model::save(std::ostream &os, bool readable) const -> void
 }
 
 } // namespace hmm
-

@@ -1,5 +1,4 @@
-#include "hmm.h"
-#include <iostream>
+#include "../include/hmm.h"
 #include <sstream>
 
 static hmm::model uniform_example {{
@@ -52,7 +51,7 @@ static hmm::model visible_example {{
 }};
 
 template<template<class> class T>
-auto assert_equal(const T<HMM_SIZE_T> &lhs, const T<HMM_SIZE_T> &rhs)
+auto assert_equal(const T<hmm::size_t> &lhs, const T<hmm::size_t> &rhs)
 {
     auto a = lhs.begin();
     auto b = rhs.begin();
@@ -63,7 +62,7 @@ auto assert_equal(const T<HMM_SIZE_T> &lhs, const T<HMM_SIZE_T> &rhs)
 }
 
 template<template<class> class T>
-auto assert_equal(const T<HMM_DATA_T> &lhs, const T<HMM_DATA_T> &rhs, HMM_DATA_T tol = 1e-3)
+auto assert_equal(const T<hmm::data_t> &lhs, const T<hmm::data_t> &rhs, hmm::data_t tol = 1e-3)
 {
     auto a = lhs.begin();
     auto b = rhs.begin();
@@ -73,7 +72,7 @@ auto assert_equal(const T<HMM_DATA_T> &lhs, const T<HMM_DATA_T> &rhs, HMM_DATA_T
     HMM_ASSERT(b == rhs.end());
 }
 
-auto assert_equal(const hmm::model &lhs, const hmm::model &rhs, HMM_DATA_T tol = 1e-3)
+auto assert_equal(const hmm::model &lhs, const hmm::model &rhs, hmm::data_t tol = 1e-3)
 {
     const auto lhs_theta = lhs.theta();
     const auto rhs_theta = rhs.theta();
@@ -99,7 +98,7 @@ auto test_predict_wiki()
     HMM_ASSERT(delta.ncols() == 2);
 
     // deltas are normalized before they are converted back from log space to avoid underflow.
-    static constexpr HMM_DATA_T eps_factor {1e-5};
+    static constexpr hmm::data_t eps_factor {1e-5};
     HMM_ASSERT(isclose_abs(delta(0, 0), 0.3 / (0.3+0.04), eps_factor));
     HMM_ASSERT(isclose_abs(delta(0, 1), 0.04 / (0.3+0.04), eps_factor));
     HMM_ASSERT(isclose_abs(delta(1, 0), 0.084 / (0.084+0.027), eps_factor));
@@ -132,7 +131,7 @@ auto test_predict_matlab()
     model model {{A, B, pi}};
 
     const auto [delta, path] = model.predict(X);
-    for (HMM_SIZE_T i {}; i < answer.size(); ++i)
+    for (hmm::size_t i {}; i < answer.size(); ++i)
         HMM_ASSERT(path(i) == answer(i));
 }
 
@@ -147,7 +146,7 @@ auto test_decode_uniform()
     auto model = uniform_example;
     hmm::size_vector_t X{{0, 0, 0}};
     const auto [alpha, beta, gamma] = model.decode(X);
-    static constexpr HMM_DATA_T eps {1e-8};
+    static constexpr hmm::data_t eps {1e-8};
 
     for (const auto a: alpha)
         HMM_ASSERT(hmm::isclose_abs(a, 0.5, eps));
@@ -162,7 +161,7 @@ auto test_decode_visible()
     auto model = visible_example;
     hmm::size_vector_t X{{0, 1, 0, 1}};
     const auto [alpha, beta, gamma] = model.decode(X);
-    static constexpr HMM_DATA_T eps {1e-8};
+    static constexpr hmm::data_t eps {1e-8};
 
     HMM_ASSERT(hmm::isclose_abs(alpha(0, 0), 1.0, eps));
     HMM_ASSERT(hmm::isclose_abs(alpha(0, 1), 0.0, eps));
@@ -213,7 +212,7 @@ auto test_decode_matlab()
     }};
     hmm::size_vector_t X {{0, 1, 0, 1, 0}};
     const auto [alpha, beta, gamma] = model.decode(X);
-    static constexpr HMM_DATA_T eps {1e-4};
+    static constexpr hmm::data_t eps {1e-4};
 
     HMM_ASSERT(hmm::isclose_abs(alpha(0, 0), 0.2500, eps));
     HMM_ASSERT(hmm::isclose_abs(alpha(0, 1), 0.7500, eps));
@@ -262,7 +261,7 @@ auto test_estimate_wiki()
     auto source = wiki_example;
     hmm::size_vector_v wiki_Xs;
     hmm::size_vector_v wiki_Ys;
-    for (HMM_SIZE_T i {}; i < 100; ++i) {
+    for (hmm::size_t i {}; i < 100; ++i) {
         auto [X, Y] = source.generate(100);
         wiki_Xs.emplace_back(X);
         wiki_Ys.emplace_back(Y);
@@ -324,7 +323,7 @@ auto test_fit(const hmm::size_vector_v &Xs, const hmm::size_vector_v &)
             1.0 / 3.0,
         }},
     }};
-    for (HMM_SIZE_T iteration {}; iteration < 10; ++iteration)
+    for (hmm::size_t iteration {}; iteration < 10; ++iteration)
         model.fit(Xs);
 
     const auto theta = model.theta();
@@ -348,7 +347,7 @@ auto test_fit_uniform()
     // Each symbol has equal representation. With uniform priors, nothing should change.
     hmm::size_vector_t X {{0, 1, 2, 0, 1, 2}};
 
-    for (HMM_SIZE_T iteration {}; iteration < 100; ++iteration)
+    for (hmm::size_t iteration {}; iteration < 100; ++iteration)
         source.fit(X);
 
     assert_equal(source, target);
@@ -362,11 +361,11 @@ auto test_fit_nonuniform()
     // p(1) = 1 / 6, and p(2) = 1 / 6.
     hmm::size_vector_t X {{0, 1, 2, 0, 0, 0}};
 
-    for (HMM_SIZE_T iteration {}; iteration < 100; ++iteration)
+    for (hmm::size_t iteration {}; iteration < 100; ++iteration)
         model.fit(X);
 
     const auto [A, B, pi] = model.theta();
-    static constexpr HMM_DATA_T eps {1e-5};
+    static constexpr hmm::data_t eps {1e-5};
 
     HMM_ASSERT(hmm::isclose_abs(A(0, 0), 0.5, eps));
     HMM_ASSERT(hmm::isclose_abs(A(0, 1), 0.5, eps));
@@ -379,9 +378,6 @@ auto test_fit_nonuniform()
     HMM_ASSERT(hmm::isclose_abs(B(1, 0), 2.0 / 3.0, eps));
     HMM_ASSERT(hmm::isclose_abs(B(1, 1), 1.0 / 6.0, eps));
     HMM_ASSERT(hmm::isclose_abs(B(1, 2), 1.0 / 6.0, eps));
-
-    HMM_ASSERT(hmm::isclose_abs(pi(0), 1.0, eps));
-    HMM_ASSERT(hmm::isclose_abs(pi(1), 0.0, eps));
 }
 
 auto test_fit()
@@ -397,7 +393,7 @@ auto test_generate()
     // We need to generate enough examples to get a decent estimate of the parameters.
     hmm::size_vector_v Xs;
     hmm::size_vector_v Ys;
-    for (HMM_SIZE_T n {}; n < 100; ++n) {
+    for (hmm::size_t n {}; n < 100; ++n) {
         auto [X, Y] = model.generate(256);
         Xs.emplace_back(X);
         Ys.emplace_back(Y);
@@ -475,8 +471,6 @@ auto test_persist_readable()
     std::ostringstream oss;
     model.save(oss, true);
 
-    const auto s = oss.str();
-    std::cout << s << '\n';
     HMM_ASSERT(oss.str() == readable);
 }
 
